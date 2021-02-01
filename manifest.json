@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.1",
+	"id": "obsidian-reminder-plugin",
+	"name": "Reminder plugin",
+	"version": "1.0.0",
 	"minAppVersion": "0.9.12",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
+	"description": "This plugin helps you make notes and get reminded when you create the daily note for that day.",
+	"author": "Andrés Sainz de Aja",
 	"authorUrl": "https://obsidian.md/about",
 	"isDesktopOnly": false
 }
