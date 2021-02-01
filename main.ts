@@ -5,6 +5,7 @@ import { createDailyNote } from 'obsidian-daily-notes-interface';
 interface ReminderPluginSettings {
 	dailyNotesFolder: string;
 	defaultWhen: string;
+	defaultHeader: string;
 }
 
 interface ReminderInterface {
@@ -30,7 +31,8 @@ class Reminder implements ReminderInterface {
 
 const DEFAULT_SETTINGS: ReminderPluginSettings = {
 	dailyNotesFolder: '',
-	defaultWhen: 'next week'
+	defaultWhen: 'next week',
+	defaultHeader: '### Reminder ###'
 }
 
 export default class ReminderPlugin extends Plugin {
@@ -90,10 +92,9 @@ export default class ReminderPlugin extends Plugin {
 				}
 				let files = this.app.vault.getFiles();
 				const dailyNoteFile = files.find(f => f.path.indexOf(dailyNote) > -1);
-				const tag: string = '### Scheduled to review ###';
 
 				this.app.vault.read(dailyNoteFile).then(dailyNoteContent => {
-					let newDailyNoteContent: string = dailyNoteContent.replace(tag, `${tag}\n - [ ] ${content.join('\n- [ ] ')}`);
+					let newDailyNoteContent: string = dailyNoteContent.replace(this.settings.defaultHeader, `${this.settings.defaultHeader}\n - [ ] ${content.join('\n- [ ] ')}`);
 					this.app.vault.modify(dailyNoteFile, newDailyNoteContent);
 				});
 			});
@@ -139,6 +140,18 @@ class ReminderPluginSettingsTab extends PluginSettingTab {
 					.onChange((value) => {
 						console.log("The new daily notes folder:" + value);
 						plugin.settings.dailyNotesFolder = value;
+						plugin.saveData(plugin.settings);
+					}));
+
+		new Setting(containerEl)
+			.setName('Header')
+			.setDesc('Set the header where you reminders will be added')
+			.addText((text) =>
+				text
+					.setPlaceholder('')
+					.setValue(plugin.settings.defaultHeader)
+					.onChange((value) => {
+						plugin.settings.defaultHeader = value;
 						plugin.saveData(plugin.settings);
 					}));
 	}
