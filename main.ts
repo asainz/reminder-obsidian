@@ -12,6 +12,7 @@ interface ReminderInterface {
 	raw: string;
 	content: string;
 	when: string;
+	keyword: string;
 	moment: object;
 }
 
@@ -19,20 +20,36 @@ class Reminder implements ReminderInterface {
 	raw: string = '';
 	when: string = '';
 	content: string = '';
+	keyword: string = '';
 	moment: object = {};
+
+	static commandKeywords: Array<string> = ['/remind', '/remindme'];
+	static createRegExp = (keyword: string) => new RegExp(`\\${keyword}\\s`);
+	static negatedReminderSymbol: string = '~~';
+
+	static isReminder(line: string): boolean {
+		return Reminder.commandKeywords.some(c => {
+			if (line.startsWith(Reminder.negatedReminderSymbol)) {
+				return false;
+			}
+			const reminderRegexp = Reminder.createRegExp(c);
+			return line.match(reminderRegexp)
+		});
+	}
 
 	constructor(raw: string, defaultWhen: string, nldates: any) {
 		this.raw = raw;
 		this.content = raw.split('@')[0];
 		this.when = raw.split('@')[1] || defaultWhen;
 		this.moment = nldates.parseDate(this.when);
+		this.keyword = Reminder.commandKeywords.find(c => raw.match(Reminder.createRegExp(c));
 	}
 }
 
 const DEFAULT_SETTINGS: ReminderPluginSettings = {
 	dailyNotesFolder: '',
 	defaultWhen: 'next week',
-	defaultHeader: '### Reminder ###'
+	defaultHeader: '# Daily notes and to-dos'
 }
 
 export default class ReminderPlugin extends Plugin {
@@ -57,16 +74,11 @@ export default class ReminderPlugin extends Plugin {
 		// this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	isReminder(line: string): boolean {
-		const commandKeywords: Array<string> = ['/remind'];
-		return commandKeywords.some(c => line.indexOf(c) === 0);
-	}
-
 	async saveReminders() {
 		const file = this.app.workspace.activeLeaf.view.file;
-		this.app.vault.read(file).then((content: string) => {
-			const lines = content.split('\n').map(l => l.startsWith('- ') ? l.replace('- ', '') : l);
-			const reminders: Array<Reminder> = lines.filter(l => this.isReminder(l)).map(r => new Reminder(r, this.settings.defaultWhen, this.app.plugins.getPlugin('nldates-obsidian')));
+		this.app.vault.read(file).then((currentNoteContent: string) => {
+			const lines = currentNoteContent.split('\n').map(l => l.startsWith('- ') ? l.replace('- ', '') : l);
+			const reminders: Array<Reminder> = lines.filter(l => Reminder.isReminder(l)).map(r => new Reminder(r, this.settings.defaultWhen, this.app.plugins.getPlugin('nldates-obsidian')));
 
 			let items = {};
 			reminders.forEach(reminder => {
@@ -74,10 +86,11 @@ export default class ReminderPlugin extends Plugin {
 					items[reminder.moment.formattedString] = [];
 				}
 
-				items[reminder.moment.formattedString].push(reminder.content);
+				items[reminder.moment.formattedString].push(reminder.content.replace(reminder.keyword, ''));
 
 			});
 
+			console.log('reminders', reminders);
 
 			Object.keys(items).forEach(async dailyNote => {
 				let files = this.app.vault.getFiles();
@@ -94,8 +107,17 @@ export default class ReminderPlugin extends Plugin {
 				const dailyNoteFile = files.find(f => f.path.indexOf(dailyNote) > -1);
 
 				this.app.vault.read(dailyNoteFile).then(dailyNoteContent => {
-					let newDailyNoteContent: string = dailyNoteContent.replace(this.settings.defaultHeader, `${this.settings.defaultHeader}\n - [ ] ${content.join('\n- [ ] ')}`);
-					this.app.vault.modify(dailyNoteFile, newDailyNoteContent);
+					let newDailyNoteContent: string = dailyNoteContent.replace(this.settings.defaultHeader, `${this.settings.defaultHeader}\n- [ ]${content.join('\n- [ ]')}`);
+					this.app.vault.modify(dailyNoteFile, newDailyNoteContent).then(() => {
+						Object.keys(items).forEach(dailyNote => {
+							const currentFile = this.app.workspace.activeLeaf.view.file;
+							let currentNoteNewContent: string = currentNoteContent;
+							reminders.forEach((reminder) => {
+								currentNoteNewContent = currentNoteNewContent.replace(reminder.raw, `${Reminder.negatedReminderSymbol}${reminder.raw}${Reminder.negatedReminderSymbol}`);
+							});
+							this.app.vault.modify(currentFile, currentNoteNewContent);
+						})
+					});
 				});
 			});
 		});
