@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-reminder-plugin",
 	"name": "Reminder plugin",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "0.9.12",
 	"description": "This plugin helps you make notes and get reminded when you create the daily note for that day.",
 	"author": "Andrés Sainz de Aja",
