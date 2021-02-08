@@ -5,6 +5,6 @@
 	"minAppVersion": "0.9.12",
 	"description": "This plugin helps you make notes and get reminded when you create the daily note for that day.",
 	"author": "Andrés Sainz de Aja",
-	"authorUrl": "https://obsidian.md/about",
+	"authorUrl": "https://github.com/asainz/",
 	"isDesktopOnly": false
 }
