@@ -1,55 +1,59 @@
 import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { createDailyNote } from 'obsidian-daily-notes-interface';
 
-interface ReminderPluginSettings {
-    dailyNotesFolder: string;
-    defaultWhen: string;
-    defaultHeader: string;
-}
-
 interface ReminderInterface {
     raw: string;
     content: string;
     when: string;
     keyword: string;
     moment: object;
+
+    triggers: Array<string>;
+    negationSymbol: string;
+    createRegExp: (trigger: string) => RegExp;
+    negateContent: () => string;
+    _isReminder: (line: string) => boolean;
 }
 
 class Reminder implements ReminderInterface {
-    raw: string = '';
-    when: string = '';
-    content: string = '';
-    keyword: string = '';
-    moment: object = {};
+    raw = '';
+    when = '';
+    content = '';
+    keyword = '';
+    moment = {};
 
-    static commandKeywords: Array<string> = ['/remind', '/remindme'];
-    static createRegExp = (keyword: string) => new RegExp(`\\${keyword}\\s`);
-    static negatedReminderSymbol: string = '~~';
+    triggers: ['/remind', '/remindme'];
+    negationSymbol: '~~';
 
-    static isReminder(line: string): boolean {
-        return Reminder.commandKeywords.some((c) => {
-            if (line.startsWith(Reminder.negatedReminderSymbol)) {
+    _isReminder(line: string) {
+        return this.triggers.some((trigger) => {
+            if (line.startsWith(this.negationSymbol)) {
                 return false;
             }
-            const reminderRegexp = Reminder.createRegExp(c);
+            const reminderRegexp = this.createRegExp(trigger);
             return line.match(reminderRegexp);
         });
     }
 
+    createRegExp(trigger: string) {
+        return new RegExp(`\\${trigger}\\s`);
+    }
+
+    negateContent() {
+        return `${this.negationSymbol}${this.raw}${this.negationSymbol}`;
+    }
+
     constructor(raw: string, defaultWhen: string, nldates: any) {
+        if (!this._isReminder(raw)) {
+            return null;
+        }
         this.raw = raw;
         this.content = raw.split('@')[0];
         this.when = raw.split('@')[1] || defaultWhen;
         this.moment = nldates.parseDate(this.when);
-        this.keyword = Reminder.commandKeywords.find((c) => raw.match(Reminder.createRegExp(c)));
+        this.keyword = this.triggers.find((c) => raw.match(this.createRegExp(c)));
     }
 }
-
-const DEFAULT_SETTINGS: ReminderPluginSettings = {
-    dailyNotesFolder: '',
-    defaultWhen: 'next week',
-    defaultHeader: '# Daily notes and to-dos',
-};
 
 export default class ReminderPlugin extends Plugin {
     settings: ReminderPluginSettings;
@@ -80,8 +84,8 @@ export default class ReminderPlugin extends Plugin {
         this.app.vault.read(file).then((currentNoteContent: string) => {
             const lines = currentNoteContent.split('\n').map((l) => (l.startsWith('- ') ? l.replace('- ', '') : l));
             const reminders: Array<Reminder> = lines
-                .filter((l) => Reminder.isReminder(l))
-                .map((r) => new Reminder(r, this.settings.defaultWhen, this.app.plugins.getPlugin('nldates-obsidian')));
+                .map((l) => new Reminder(l, this.settings.defaultWhen, this.app.plugins.getPlugin('nldates-obsidian')))
+                .filter((l) => !!l);
 
             let items = {};
             reminders.forEach((reminder) => {
@@ -120,7 +124,7 @@ export default class ReminderPlugin extends Plugin {
                             reminders.forEach((reminder) => {
                                 currentNoteNewContent = currentNoteNewContent.replace(
                                     reminder.raw,
-                                    `${Reminder.negatedReminderSymbol}${reminder.raw}${Reminder.negatedReminderSymbol}`,
+                                    reminder.negateContent(),
                                 );
                             });
                             this.app.vault.modify(currentFile, currentNoteNewContent);
@@ -143,6 +147,19 @@ export default class ReminderPlugin extends Plugin {
         await this.saveData(this.settings);
     }
 }
+
+// Settings tab
+interface ReminderPluginSettings {
+    dailyNotesFolder: string;
+    defaultWhen: string;
+    defaultHeader: string;
+}
+
+const DEFAULT_SETTINGS: ReminderPluginSettings = {
+    dailyNotesFolder: '',
+    defaultWhen: 'next week',
+    defaultHeader: '# Daily notes and to-dos',
+};
 
 class ReminderPluginSettingsTab extends PluginSettingTab {
     plugin: ReminderPlugin;
